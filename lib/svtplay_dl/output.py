@@ -166,9 +166,13 @@ def output(options, extension="mp4", openfd=True, mode="wb", **kwargs):
                     log.error("File (%s) already exists. Use --force-subtitle to overwrite" % options.output)
                     return None
             else:
-                if not options.force:
-                    log.error("File (%s) already exists. Use --force to overwrite" % options.output)
+                if not options.force and not options.resume:
+                    log.error("File (%s) already exists. Use --force to overwrite or --resume to resume" % options.output)
                     return None
+
+        if options.resume:
+            mode = "ab"
+
         if openfd:
             file_d = open(options.output, mode, **kwargs)
     else:

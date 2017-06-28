@@ -10,6 +10,7 @@ import re
 from svtplay_dl.output import progress_stream, output, ETA, progressbar
 from svtplay_dl.utils.urllib import urljoin
 from svtplay_dl.error import UIException, ServiceError
+from svtplay_dl.log import log
 from svtplay_dl.fetcher import VideoRetriever
 
 
@@ -190,19 +191,53 @@ class DASH(VideoRetriever):
             file_d = output(self.options, self.options.other)
         if hasattr(file_d, "read") is False:
             return
+
+        if file_d == None:
+            return
         eta = ETA(len(files))
         n = 1
+        # check if we can resume a past download
+        already_downloaded = os.fstat(file_d.fileno()).st_size
+        if self.options.resume and already_downloaded != 0:
+            print 'Checking for existing segments...'
+        bytes_so_far = 0
+        resumed = False
+        data_size = 0
         for i in files:
             if self.options.output != "-" and not self.options.silent:
                 eta.increment()
                 progressbar(len(files), n, ''.join(['ETA: ', str(eta)]))
                 n += 1
-            data = self.http.request("get", i, cookies=cookies)
 
-            if data.status_code == 404:
-                break
-            data = data.content
-            file_d.write(data)
+            # get segment size
+            if self.options.resume and already_downloaded != 0:
+                if bytes_so_far < already_downloaded:
+                    head_req = self.http.request("head", i, cookies=cookies)
+                    if head_req.status_code == 404:
+                        break
+                    data_size = int(head_req.headers['Content-Length'])
+                    bytes_so_far += data_size
+                    log.debug('Segment %d', n-1)
+                    log.debug('So far: %d, segment size: %d, on disk: %d', bytes_so_far - data_size, data_size, already_downloaded)
+                if bytes_so_far >= already_downloaded:
+                    if not resumed and self.options.resume:
+                        print
+                        print 'Resuming download on segment %d' % (n-1)
+                        log.debug('Truncating output file to %d', bytes_so_far - data_size)              
+                        file_d.truncate(bytes_so_far - data_size) # line up the file with a segment boundary                              
+                        eta = ETA(len(files) - n)          
+                        resumed = True
+                    data = self.http.request("get", i, cookies=cookies)
+                    if data.status_code == 404:
+                        break
+                    data = data.content
+                    file_d.write(data)
+            else:
+                data = self.http.request("get", i, cookies=cookies)
+                if data.status_code == 404:
+                    break
+                data = data.content
+                file_d.write(data)
 
         if self.options.output != "-":
             file_d.close()
