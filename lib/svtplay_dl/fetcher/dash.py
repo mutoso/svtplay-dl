@@ -199,7 +199,7 @@ class DASH(VideoRetriever):
         # check if we can resume a past download
         already_downloaded = os.fstat(file_d.fileno()).st_size
         if self.options.resume and already_downloaded != 0:
-            print 'Checking for existing segments...'
+            print('Checking for existing segments...')
         bytes_so_far = 0
         resumed = False
         data_size = 0
@@ -222,7 +222,7 @@ class DASH(VideoRetriever):
                 if bytes_so_far >= already_downloaded:
                     if not resumed and self.options.resume:
                         print
-                        print 'Resuming download on segment %d' % (n-1)
+                        print('Resuming download on segment ' + str(n-1))
                         log.debug('Truncating output file to %d', bytes_so_far - data_size)              
                         file_d.truncate(bytes_so_far - data_size) # line up the file with a segment boundary                              
                         eta = ETA(len(files) - n)          
